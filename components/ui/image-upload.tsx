@@ -200,7 +200,7 @@ export function ImageUpload({
               <div key={index} className="relative group">
                 <div className="aspect-square rounded-lg overflow-hidden border border-gray-200">
                   <img
-                    src={`/${imagePath}`}
+                    src={imagePath.startsWith('/') ? imagePath : `/${imagePath}`}
                     alt={`Image ${index + 1}`}
                     className="w-full h-full object-cover"
                     onError={(e) => {

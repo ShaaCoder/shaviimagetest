@@ -3,6 +3,7 @@ import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import { generateUniqueFileName } from '@/lib/image-utils';
+import { uploadToCloudinary, isCloudinaryConfigured, getCloudinaryStatus } from '@/lib/cloudinary-upload';
 
 // Configure for Vercel
 export const runtime = 'nodejs';
@@ -79,11 +80,25 @@ export async function POST(request: NextRequest) {
       const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME;
       
       if (isServerless) {
-        // In serverless, we cannot write to filesystem
-        // For now, we'll simulate upload success but won't actually save
-        // In production, you should implement cloud storage here
-        uploadedImages.push(`uploads/${uploadType}/${uniqueFilename}`);
-        console.log(`📤 Simulated upload (serverless): ${uniqueFilename}`);
+        // In serverless environment, use Cloudinary for image storage
+        if (isCloudinaryConfigured()) {
+          try {
+            const cloudinaryUrl = await uploadToCloudinary(buffer, uniqueFilename, uploadType);
+            uploadedImages.push(cloudinaryUrl);
+            console.log(`✅ Uploaded to Cloudinary: ${uniqueFilename}`);
+          } catch (cloudinaryError) {
+            console.error('❌ Cloudinary upload failed:', cloudinaryError);
+            // Fallback to placeholder
+            uploadedImages.push('/placeholder-image.svg');
+            console.log(`⚠️ Using placeholder due to Cloudinary error: ${cloudinaryError instanceof Error ? cloudinaryError.message : String(cloudinaryError)}`);
+          }
+        } else {
+          // Cloudinary not configured, use placeholder
+          uploadedImages.push('/placeholder-image.svg');
+          console.log('⚠️ Cloudinary not configured, using placeholder');
+          console.log('📋 Configure Cloudinary by setting environment variables:');
+          console.log('   CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET');
+        }
       } else {
         // Local development - save to filesystem
         const uploadDir = path.join(process.cwd(), 'public', 'uploads', uploadType);
@@ -131,10 +146,20 @@ export async function OPTIONS(request: NextRequest) {
 }
 
 export async function GET() {
+  const cloudinaryStatus = getCloudinaryStatus();
+  const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME;
+  
   return NextResponse.json({
     message: 'Simple image upload endpoint (no Sharp dependency)',
     methods: ['POST'],
     maxFileSize: '20MB',
-    maxFiles: 10
+    maxFiles: 10,
+    environment: isServerless ? 'serverless' : 'local',
+    storage: {
+      cloudinary: cloudinaryStatus,
+      enabled: cloudinaryStatus.configured
+    },
+    status: cloudinaryStatus.configured ? 'ready' : 'configuration_needed',
+    timestamp: new Date().toISOString()
   });
 }
