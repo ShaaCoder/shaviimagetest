@@ -3,12 +3,22 @@ import { writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import { generateUniqueFileName, DEFAULT_IMAGE_CONFIG } from '@/lib/image-utils';
-import { 
-  processImagesInParallel, 
-  validateImage, 
-  DEFAULT_OPTIMIZATION_OPTIONS,
-  type OptimizedImageResult 
-} from '@/lib/image-optimizer';
+// Import image processing with error handling
+let processImagesInParallel: any;
+let validateImage: any;
+let DEFAULT_OPTIMIZATION_OPTIONS: any;
+type OptimizedImageResult = any;
+
+// Try to import Sharp-based processing, fallback to basic processing
+try {
+  const imageOptimizer = require('@/lib/image-optimizer');
+  processImagesInParallel = imageOptimizer.processImagesInParallel;
+  validateImage = imageOptimizer.validateImage;
+  DEFAULT_OPTIMIZATION_OPTIONS = imageOptimizer.DEFAULT_OPTIMIZATION_OPTIONS;
+} catch (error) {
+  console.log('Sharp not available, using fallback image processing');
+  // Fallback functions will be defined below
+}
 import { uploadWithFallback, getStorageProvider } from '@/lib/cloud-storage';
 
 // Configure API route for handling large uploads
@@ -25,6 +35,32 @@ export const preferredRegion = 'auto';
 const maxFileSize = parseInt(process.env.MAX_FILE_SIZE || '20971520'); // 20MB default
 const maxFiles = 10; // Maximum number of files per request
 const concurrency = 4; // Process 4 images in parallel
+
+// Fallback image validation when Sharp is not available
+function fallbackValidateImage(buffer: Buffer) {
+  // Basic image validation by checking headers
+  const jpg = buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF;
+  const png = buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47;
+  const gif = buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46;
+  const webp = buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50;
+  
+  if (jpg || png || gif || webp) {
+    return { isValid: true };
+  }
+  return { isValid: false, error: 'Invalid image format' };
+}
+
+// Fallback image processing (no optimization, just save as-is)
+function fallbackProcessImages(fileBuffers: Array<{buffer: Buffer, filename: string}>) {
+  return Promise.resolve(fileBuffers.map(({buffer, filename}) => [{
+    buffer,
+    filename,
+    format: filename.split('.').pop()?.toLowerCase() || 'jpg',
+    size: buffer.length,
+    width: 800, // Default dimensions
+    height: 600
+  }]));
+}
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
@@ -90,8 +126,10 @@ export async function POST(request: NextRequest) {
         
         const buffer = Buffer.from(await file.arrayBuffer());
         
-        // Fast validation using Sharp
-        const validation = await validateImage(buffer);
+        // Validate image using available method
+        const validation = validateImage ? 
+          await validateImage(buffer) : 
+          fallbackValidateImage(buffer);
         if (!validation.isValid) {
           throw new Error(`Invalid image ${file.name}: ${validation.error}`);
         }
@@ -102,12 +140,14 @@ export async function POST(request: NextRequest) {
     
     console.log(`📊 Images validated in ${Date.now() - startTime}ms`);
     
-    // Process all images in parallel with controlled concurrency
-    const optimizedResults = await processImagesInParallel(
-      fileBuffers,
-      optimizationOptions,
-      concurrency
-    );
+    // Process all images using available method
+    const optimizedResults = processImagesInParallel ? 
+      await processImagesInParallel(
+        fileBuffers,
+        optimizationOptions,
+        concurrency
+      ) : 
+      await fallbackProcessImages(fileBuffers);
     
     console.log(`🔄 Images optimized in ${Date.now() - startTime}ms`);
     
@@ -205,7 +245,9 @@ export async function POST(request: NextRequest) {
 
 // Helper function to get optimization options based on level
 function getOptimizationOptions(level: string) {
-  const baseOptions = { ...DEFAULT_OPTIMIZATION_OPTIONS };
+  const baseOptions = DEFAULT_OPTIMIZATION_OPTIONS ? 
+    { ...DEFAULT_OPTIMIZATION_OPTIONS } : 
+    { quality: 85, format: 'webp' as const };
   
   switch (level) {
     case 'fast':
