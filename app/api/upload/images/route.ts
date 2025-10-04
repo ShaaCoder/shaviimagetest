@@ -4,10 +4,18 @@ import { existsSync } from 'fs';
 import path from 'path';
 import { generateUniqueFileName, DEFAULT_IMAGE_CONFIG } from '@/lib/image-utils';
 // Import image processing with error handling
-let processImagesInParallel: any;
-let validateImage: any;
+let processImagesInParallel: ((fileBuffers: Array<{buffer: Buffer, filename: string}>, options: any, concurrency: number) => Promise<any[][]>) | undefined;
+let validateImage: ((buffer: Buffer) => Promise<{isValid: boolean, error?: string}>) | undefined;
 let DEFAULT_OPTIMIZATION_OPTIONS: any;
-type OptimizedImageResult = any;
+
+interface OptimizedImageResult {
+  buffer: Buffer;
+  filename: string;
+  format: string;
+  size: number;
+  width: number;
+  height: number;
+}
 
 // Try to import Sharp-based processing, fallback to basic processing
 try {
@@ -51,8 +59,8 @@ function fallbackValidateImage(buffer: Buffer) {
 }
 
 // Fallback image processing (no optimization, just save as-is)
-function fallbackProcessImages(fileBuffers: Array<{buffer: Buffer, filename: string}>) {
-  return Promise.resolve(fileBuffers.map(({buffer, filename}) => [{
+function fallbackProcessImages(fileBuffers: Array<{buffer: Buffer, filename: string}>): Promise<OptimizedImageResult[][]> {
+  return Promise.resolve(fileBuffers.map(({buffer, filename}): OptimizedImageResult[] => [{
     buffer,
     filename,
     format: filename.split('.').pop()?.toLowerCase() || 'jpg',
@@ -203,8 +211,8 @@ export async function POST(request: NextRequest) {
     console.log(`✅ All images saved in ${Date.now() - startTime}ms`);
     
     // Calculate stats
-    const totalOptimizedSize = optimizedResults.flat().reduce((sum, img) => sum + img.size, 0);
-    const originalSize = fileBuffers.reduce((sum, file) => sum + file.buffer.length, 0);
+    const totalOptimizedSize = optimizedResults.flat().reduce((sum: number, img: OptimizedImageResult) => sum + img.size, 0);
+    const originalSize = fileBuffers.reduce((sum: number, file: {buffer: Buffer, filename: string}) => sum + file.buffer.length, 0);
     const compressionRatio = Math.round((1 - totalOptimizedSize / originalSize) * 100);
 
     const totalTime = Date.now() - startTime;
