@@ -160,12 +160,16 @@ export function ImageUpload({
       if (result.success) {
         // Show success message with stats
         console.log(`✨ Upload completed in ${totalTime}ms:`, result.stats);
+        console.log('🖼️ Upload result:', result);
+        console.log('🖼️ Returned images:', result.images);
         
-        // Add uploaded images to existing ones - use only main optimized images for display
-        const mainImages = result.images.filter((img: string) => 
-          !img.includes('_thumb') && !img.includes('_medium') && !img.includes('_large')
-        );
-        const newImages = [...value, ...mainImages];
+        // For Cloudinary images, we don't filter by variants since Cloudinary handles optimization differently
+        const uploadedImages = result.images || [];
+        console.log('🖼️ Processed images:', uploadedImages);
+        
+        const newImages = [...value, ...uploadedImages];
+        console.log('🖼️ Final image array:', newImages);
+        
         onChange(newImages);
         setFiles([]); // Clear selected files
         setUploadProgress({ loaded: 0, total: 0, percentage: 0 });
@@ -200,7 +204,7 @@ export function ImageUpload({
               <div key={index} className="relative group">
                 <div className="aspect-square rounded-lg overflow-hidden border border-gray-200">
                   <img
-                    src={imagePath.startsWith('/') ? imagePath : `/${imagePath}`}
+                    src={imagePath.startsWith('http') ? imagePath : (imagePath.startsWith('/') ? imagePath : `/${imagePath}`)}
                     alt={`Image ${index + 1}`}
                     className="w-full h-full object-cover"
                     onError={(e) => {
