@@ -19,15 +19,7 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 30; // 30 seconds
 export const preferredRegion = 'auto';
 
-// Body parser configuration for large uploads
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '50mb',
-    },
-    responseLimit: false,
-  },
-};
+// Note: Body parser configuration is handled automatically in App Router
 
 // Configure file size limits - increased for better performance
 const maxFileSize = parseInt(process.env.MAX_FILE_SIZE || '20971520'); // 20MB default

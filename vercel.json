@@ -9,11 +9,5 @@
     }
   },
   "regions": ["iad1"],
-  "framework": "nextjs",
-  "rewrites": [
-    {
-      "source": "/api/upload/images",
-      "destination": "/api/upload/images"
-    }
-  ]
+  "framework": "nextjs"
 }
