@@ -40,26 +40,26 @@ export async function uploadToCloudinary(
   try {
     console.log(`📤 Uploading ${filename} to Cloudinary folder: ${folder}`);
     
-    // Convert buffer to base64 data URI
+    // Convert buffer to base64 data URI with proper MIME type detection
     const base64Data = buffer.toString('base64');
-    const dataURI = `data:image/jpeg;base64,${base64Data}`;
+    
+    // Basic MIME type detection based on file header
+    let mimeType = 'image/jpeg'; // default
+    if (buffer[0] === 0x89 && buffer[1] === 0x50) mimeType = 'image/png';
+    else if (buffer[0] === 0x47 && buffer[1] === 0x49) mimeType = 'image/gif';
+    else if (buffer[0] === 0xFF && buffer[1] === 0xD8) mimeType = 'image/jpeg';
+    else if (buffer[8] === 0x57 && buffer[9] === 0x45) mimeType = 'image/webp';
+    
+    const dataURI = `data:${mimeType};base64,${base64Data}`;
 
-    // Upload options
+    // Simple upload options (avoid complex transformations that might cause errors)
     const uploadOptions = {
       folder: folder,
       public_id: filename.split('.')[0], // Remove extension
       resource_type: 'image' as const,
-      format: 'auto', // Auto-detect format
-      quality: 'auto:good', // Optimize quality
-      fetch_format: 'auto', // Auto-select best format
-      transformation: [
-        {
-          quality: 'auto:good',
-          fetch_format: 'auto'
-        }
-      ],
       overwrite: true,
-      invalidate: true
+      unique_filename: false,
+      use_filename: true
     };
 
     // Upload to Cloudinary
@@ -76,21 +76,34 @@ export async function uploadToCloudinary(
   } catch (error) {
     console.error('❌ Cloudinary upload failed:', error);
     
+    // Log detailed error information for debugging
+    if (typeof error === 'object' && error !== null) {
+      console.error('Error details:', {
+        message: (error as any).message,
+        http_code: (error as any).http_code,
+        error_code: (error as any).error?.code,
+        error_message: (error as any).error?.message
+      });
+    }
+    
     // Provide more specific error messages
     if (error instanceof Error) {
-      if (error.message.includes('Invalid API Key')) {
+      if (error.message.includes('Invalid API Key') || (error as any).http_code === 401) {
         throw new Error('Invalid Cloudinary API Key. Please check your CLOUDINARY_API_KEY environment variable.');
       }
-      if (error.message.includes('Invalid cloud name')) {
+      if (error.message.includes('Invalid cloud name') || error.message.includes('cloud_name')) {
         throw new Error('Invalid Cloudinary Cloud Name. Please check your CLOUDINARY_CLOUD_NAME environment variable.');
       }
-      if (error.message.includes('Invalid signature')) {
+      if (error.message.includes('Invalid signature') || (error as any).http_code === 403) {
         throw new Error('Invalid Cloudinary API Secret. Please check your CLOUDINARY_API_SECRET environment variable.');
+      }
+      if (error.message.includes('Invalid extension') || error.message.includes('transformation')) {
+        throw new Error(`Cloudinary configuration error: ${error.message}`);
       }
       throw new Error(`Cloudinary upload error: ${error.message}`);
     }
     
-    throw new Error(`Failed to upload to Cloudinary: ${String(error)}`);
+    throw new Error(`Failed to upload to Cloudinary: ${JSON.stringify(error)}`);
   }
 }
 
