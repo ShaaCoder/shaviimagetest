@@ -10,12 +10,17 @@ const nextConfig = {
   images: {
     formats: ['image/avif', 'image/webp'],
     remotePatterns: [
+      // Common external sources used across the app
       { protocol: 'https', hostname: 'images.pexels.com' },
       { protocol: 'http', hostname: 'localhost' },
       { protocol: 'https', hostname: 'yourdomain.com' },
       { protocol: 'https', hostname: 'assets.myntassets.com' },
       { protocol: 'https', hostname: 'www.pexels.com' },
-      { protocol: 'https', hostname: 'encrypted-tbn0.gstatic.com' }
+      { protocol: 'https', hostname: 'encrypted-tbn0.gstatic.com' },
+      // Cloudinary (required for production uploads)
+      { protocol: 'https', hostname: 'res.cloudinary.com' },
+      // Optional: Vercel Blob/Storage (if you switch to it later)
+      { protocol: 'https', hostname: 'blob.vercel-storage.com' }
     ],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
