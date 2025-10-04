@@ -1,9 +1,19 @@
 {
   "functions": {
     "app/api/upload/images/route.ts": {
+      "maxDuration": 30,
+      "memory": 1024
+    },
+    "app/api/**/route.ts": {
       "maxDuration": 30
     }
   },
   "regions": ["iad1"],
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "rewrites": [
+    {
+      "source": "/api/upload/images",
+      "destination": "/api/upload/images"
+    }
+  ]
 }

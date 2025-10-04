@@ -47,6 +47,7 @@ const nextConfig = {
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",
+      "base-uri 'self'",
       "frame-ancestors 'none'",
       "upgrade-insecure-requests",
       ...(cspReportUri ? [`report-uri ${cspReportUri}`] : [])
@@ -126,6 +127,28 @@ const nextConfig = {
           {
             key: 'Cache-Control',
             value: 'no-store, no-cache, must-revalidate, proxy-revalidate'
+          }
+        ],
+      },
+      // Upload API specific headers (less restrictive)
+      {
+        source: '/api/upload/(.*)',
+        headers: [
+          {
+            key: 'Access-Control-Allow-Origin',
+            value: '*'
+          },
+          {
+            key: 'Access-Control-Allow-Methods',
+            value: 'POST, OPTIONS, GET'
+          },
+          {
+            key: 'Access-Control-Allow-Headers',
+            value: 'Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With'
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff'
           }
         ],
       },

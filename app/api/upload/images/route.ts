@@ -15,6 +15,20 @@ import { uploadWithFallback, getStorageProvider } from '@/lib/cloud-storage';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+// Add Next.js 13+ app router configuration
+export const maxDuration = 30; // 30 seconds
+export const preferredRegion = 'auto';
+
+// Body parser configuration for large uploads
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '50mb',
+    },
+    responseLimit: false,
+  },
+};
+
 // Configure file size limits - increased for better performance
 const maxFileSize = parseInt(process.env.MAX_FILE_SIZE || '20971520'); // 20MB default
 const maxFiles = 10; // Maximum number of files per request
@@ -236,14 +250,34 @@ function getOptimizationOptions(level: string) {
   }
 }
 
-// Handle OPTIONS for CORS
-export async function OPTIONS() {
+// Handle OPTIONS for CORS preflight
+export async function OPTIONS(request: NextRequest) {
+  const origin = request.headers.get('origin');
+  const isProduction = process.env.NODE_ENV === 'production';
+  
+  const allowedOrigin = isProduction 
+    ? (origin && process.env.NEXT_PUBLIC_APP_URL?.includes(origin) ? origin : process.env.NEXT_PUBLIC_APP_URL)
+    : '*';
+    
   return new NextResponse(null, {
     status: 200,
     headers: {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': allowedOrigin || '*',
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With',
+      'Access-Control-Allow-Credentials': 'true',
+      'Access-Control-Max-Age': '86400',
+      'Vary': 'Origin',
     },
+  });
+}
+
+// Handle GET for testing endpoint availability
+export async function GET() {
+  return NextResponse.json({
+    message: 'Image upload endpoint is available',
+    methods: ['POST'],
+    maxFileSize: '20MB',
+    maxFiles: 10
   });
 }
