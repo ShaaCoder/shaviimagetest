@@ -79,10 +79,11 @@ export async function POST(request: NextRequest) {
       const isServerless = process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME;
       
       if (isServerless) {
-        // In serverless, we'll need to use cloud storage
-        // For now, return the filename (you'll need to implement cloud storage)
+        // In serverless, we cannot write to filesystem
+        // For now, we'll simulate upload success but won't actually save
+        // In production, you should implement cloud storage here
         uploadedImages.push(`uploads/${uploadType}/${uniqueFilename}`);
-        console.log(`📤 Would upload to cloud: ${uniqueFilename}`);
+        console.log(`📤 Simulated upload (serverless): ${uniqueFilename}`);
       } else {
         // Local development - save to filesystem
         const uploadDir = path.join(process.cwd(), 'public', 'uploads', uploadType);

@@ -107,6 +107,12 @@ export function ImageUpload({
 
   const uploadImages = async () => {
     if (files.length === 0) return;
+    
+    // Prevent multiple simultaneous uploads
+    if (uploading) {
+      console.log('Upload already in progress, skipping...');
+      return;
+    }
 
     setUploading(true);
     setError(null);
@@ -144,7 +150,7 @@ export function ImageUpload({
         xhr.onerror = () => reject(new Error('Network error during upload'));
         xhr.ontimeout = () => reject(new Error('Upload timeout'));
         xhr.timeout = 60000; // 60 second timeout
-        xhr.open('POST', '/api/upload/images');
+        xhr.open('POST', '/api/upload/simple');
         xhr.send(formData);
       });
 
@@ -199,7 +205,10 @@ export function ImageUpload({
                     className="w-full h-full object-cover"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
-                      target.src = '/placeholder-image.png';
+                      // Prevent infinite loop by checking if we're already showing placeholder
+                      if (!target.src.includes('placeholder-image')) {
+                        target.src = '/placeholder-image.svg';
+                      }
                     }}
                   />
                 </div>

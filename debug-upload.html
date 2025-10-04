@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Debug Tool</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            padding: 20px; 
+        }
+        .test-section { 
+            border: 1px solid #ddd; 
+            padding: 20px; 
+            margin: 20px 0; 
+            border-radius: 8px; 
+        }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+        button { 
+            padding: 10px 20px; 
+            margin: 10px 0; 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+        }
+        button:hover { background: #0056b3; }
+        .log { 
+            background: #f8f9fa; 
+            padding: 10px; 
+            margin: 10px 0; 
+            border-radius: 4px; 
+            white-space: pre-wrap; 
+            font-family: monospace; 
+        }
+        input[type="file"] { 
+            margin: 10px 0; 
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Upload Endpoint Debug Tool</h1>
+    <p>Use this tool to test your upload endpoints and debug issues.</p>
+
+    <div class="test-section">
+        <h2>📡 Test Endpoint Availability</h2>
+        <button onclick="testEndpoints()">Test All Endpoints</button>
+        <div id="endpoint-results" class="log"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>📁 Test File Upload</h2>
+        <input type="file" id="testFile" accept="image/*" multiple>
+        <br>
+        <button onclick="testSimpleUpload()">Test Simple Upload</button>
+        <button onclick="testOriginalUpload()">Test Original Upload</button>
+        <div id="upload-results" class="log"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔍 Network Monitor</h2>
+        <button onclick="startMonitoring()">Start Network Monitoring</button>
+        <button onclick="stopMonitoring()">Stop Monitoring</button>
+        <div id="network-log" class="log"></div>
+    </div>
+
+    <script>
+        let networkLog = [];
+        let monitoringInterval = null;
+
+        function log(message, type = 'info') {
+            console.log(message);
+            const timestamp = new Date().toLocaleTimeString();
+            const colored = `<span class="${type}">[${timestamp}] ${message}</span>\n`;
+            
+            // Update all log areas
+            const endpointResults = document.getElementById('endpoint-results');
+            const uploadResults = document.getElementById('upload-results');
+            const networkLogEl = document.getElementById('network-log');
+            
+            if (endpointResults) endpointResults.innerHTML += colored;
+        }
+
+        async function testEndpoints() {
+            const results = document.getElementById('endpoint-results');
+            results.innerHTML = '';
+            
+            const endpoints = [
+                '/api/upload/simple',
+                '/api/upload/images'
+            ];
+
+            for (const endpoint of endpoints) {
+                try {
+                    log(`Testing ${endpoint}...`);
+                    
+                    // Test GET request
+                    const response = await fetch(endpoint);
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        log(`✅ ${endpoint} is available: ${data.message}`, 'success');
+                    } else {
+                        log(`❌ ${endpoint} returned ${response.status}: ${data.message}`, 'error');
+                    }
+                } catch (error) {
+                    log(`❌ ${endpoint} failed: ${error.message}`, 'error');
+                }
+            }
+        }
+
+        async function testUpload(endpoint) {
+            const fileInput = document.getElementById('testFile');
+            const results = document.getElementById('upload-results');
+            
+            if (!fileInput.files.length) {
+                log('❌ Please select a file first', 'error');
+                return;
+            }
+
+            const file = fileInput.files[0];
+            log(`📤 Testing upload to ${endpoint} with file: ${file.name} (${file.size} bytes)`);
+
+            const formData = new FormData();
+            formData.append('images', file);
+            formData.append('type', 'products');
+            formData.append('optimization', 'fast');
+
+            try {
+                const startTime = Date.now();
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const duration = Date.now() - startTime;
+                const data = await response.json();
+
+                if (response.ok) {
+                    log(`✅ Upload successful in ${duration}ms`, 'success');
+                    log(`📋 Response: ${JSON.stringify(data, null, 2)}`, 'success');
+                } else {
+                    log(`❌ Upload failed (${response.status}): ${data.message || data.error}`, 'error');
+                    log(`📋 Error details: ${JSON.stringify(data, null, 2)}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Upload error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testSimpleUpload() {
+            await testUpload('/api/upload/simple');
+        }
+
+        async function testOriginalUpload() {
+            await testUpload('/api/upload/images');
+        }
+
+        function startMonitoring() {
+            log('🔍 Starting network monitoring...');
+            
+            // Monitor for 404 requests
+            const observer = new PerformanceObserver((list) => {
+                list.getEntries().forEach((entry) => {
+                    if (entry.name.includes('404') || entry.name.includes('placeholder')) {
+                        log(`⚠️ Detected request: ${entry.name}`, 'error');
+                    }
+                });
+            });
+            
+            observer.observe({ entryTypes: ['resource'] });
+
+            // Also monitor fetch/XHR requests
+            const originalFetch = window.fetch;
+            window.fetch = function(...args) {
+                log(`🌐 Fetch request: ${args[0]}`);
+                return originalFetch.apply(this, args).catch(error => {
+                    log(`❌ Fetch error: ${error.message}`, 'error');
+                    throw error;
+                });
+            };
+        }
+
+        function stopMonitoring() {
+            log('🛑 Stopping network monitoring');
+            // Restore original fetch
+            location.reload();
+        }
+
+        // Auto-test endpoints on load
+        window.onload = function() {
+            log('🚀 Upload Debug Tool loaded');
+            testEndpoints();
+        };
+    </script>
+</body>
+</html>
